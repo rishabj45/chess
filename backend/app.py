@@ -10,7 +10,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 REACT_BUILD_DIR = os.path.join(BASE_DIR, '../frontend/build')
 
 app = Flask(__name__, static_folder=REACT_BUILD_DIR, static_url_path="")
-CORS(app, origins=["http://localhost:3000"])
+CORS(app, origins=["http://localhost:3000","https://chess-2-m2y4.onrender.com"])
 DATABASE = 'tournament.db'
 
 def get_db_connection():
