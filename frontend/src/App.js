@@ -16,7 +16,7 @@ export default function App() {
           path="/"
           element={<Layout isAdmin={isAdmin} setIsAdmin={setIsAdmin} />}
         >
-          <Route index element={<Schedule />} /> {/* Renders Schedule at "/" */}
+          <Route path="/" element={<Schedule />} /> {/* Renders Schedule at "/" */}
           <Route path="schedule" element={<Schedule />} />
           <Route path="standings" element={<Standings />} />
           <Route path="teams" element={<Teams />} />
