@@ -17,7 +17,7 @@ export default function App() {
           path="/"
           element={<Layout isAdmin={isAdmin} setIsAdmin={setIsAdmin} />}
         >
-          <Route path="schedule" element={<Schedule />} />
+          <Route path="" element={<Schedule />} />
           <Route path="standings" element={<Standings />} />
           <Route path="teams" element={<Teams />} />
           <Route path="best-player" element={<BestPlayer />} />
