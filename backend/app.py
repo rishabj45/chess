@@ -1,34 +1,66 @@
-from flask import Flask, request, jsonify
+import os
 import sqlite3
 from datetime import datetime
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
-import os
-from flask import Flask, send_from_directory
-
+# ------------------------------------------------------------------
+# Configuration: adjust paths as needed
+# ------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Path to React build directory (after running `npm run build` in frontend)
 REACT_BUILD_DIR = os.path.join(BASE_DIR, '../frontend/build')
+# Path to the "static" subfolder inside the build
+REACT_STATIC_DIR = os.path.join(REACT_BUILD_DIR, 'static')
 
-app = Flask(__name__, static_folder=REACT_BUILD_DIR, static_url_path="")
-CORS(app, origins=["http://localhost:3000","https://chess-2-m2y4.onrender.com"])
-DATABASE = 'tournament.db'
+DATABASE = os.path.join(BASE_DIR, 'tournament.db')
 
+# ------------------------------------------------------------------
+# Initialize Flask app
+# ------------------------------------------------------------------
+# Serve static assets (JS/CSS/images) from the React build's static folder.
+# This makes URLs like /static/js/... map to frontend/build/static/js/...
+app = Flask(
+    __name__,
+    static_folder=REACT_STATIC_DIR,
+    static_url_path='/static'
+)
+# CORS: allow your frontend origins if needed (for dev). In production,
+# since frontend is served from same origin, CORS may not be strictly necessary.
+CORS(app, origins=[
+    "http://localhost:3000",
+    "https://chess-2-m2y4.onrender.com"
+])
+
+# Optional debug prints to verify paths at startup
+print("Flask static_folder (for /static):", app.static_folder)
+print("Exists?", os.path.exists(app.static_folder))
+print("React build index.html path:", os.path.join(REACT_BUILD_DIR, 'index.html'))
+print("Index.html exists?", os.path.exists(os.path.join(REACT_BUILD_DIR, 'index.html')))
+
+# ------------------------------------------------------------------
+# Database helper
+# ------------------------------------------------------------------
 def get_db_connection():
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
 
-# -----------------------------
-# Teams + Players endpoints
-# -----------------------------
+# ------------------------------------------------------------------
+# API Routes (all under /api/...)
+# ------------------------------------------------------------------
 
-@app.route('/api/teams')
+# Example: GET all teams with their players
+@app.route('/api/teams', methods=['GET'])
 def get_teams():
     db = get_db_connection()
     teams = db.execute('SELECT * FROM teams').fetchall()
     out = []
     for t in teams:
-        players = db.execute('SELECT * FROM players WHERE team_id = ? ORDER BY id', (t['id'],)).fetchall()
+        players = db.execute(
+            'SELECT * FROM players WHERE team_id = ? ORDER BY id',
+            (t['id'],)
+        ).fetchall()
         out.append({
             'id': t['id'],
             'name': t['name'],
@@ -59,6 +91,7 @@ def players():
         db.close()
         return jsonify(out)
     else:
+        # Create new player
         data = request.get_json() or {}
         name = data.get('name')
         rating = data.get('rating', 0)
@@ -106,7 +139,6 @@ def edit_player_rating(id):
 # -----------------------------
 # Match endpoints
 # -----------------------------
-
 @app.route('/api/matches', methods=['GET'])
 def matches():
     db = get_db_connection()
@@ -138,7 +170,6 @@ def get_match_results(match_id):
 @app.route('/api/match/<int:match_id>/players', methods=['GET', 'POST'])
 def match_players(match_id):
     db = get_db_connection()
-    # ensure match exists
     m = db.execute('SELECT team1_id, team2_id FROM matches WHERE id = ?', (match_id,)).fetchone()
     if not m:
         db.close()
@@ -146,10 +177,14 @@ def match_players(match_id):
 
     if request.method == 'GET':
         t1, t2 = m['team1_id'], m['team2_id']
-        p1 = db.execute('SELECT player_id FROM match_players WHERE match_id=? AND team_id=?',
-                        (match_id, t1)).fetchall()
-        p2 = db.execute('SELECT player_id FROM match_players WHERE match_id=? AND team_id=?',
-                        (match_id, t2)).fetchall()
+        p1 = db.execute(
+            'SELECT player_id FROM match_players WHERE match_id=? AND team_id=?',
+            (match_id, t1)
+        ).fetchall()
+        p2 = db.execute(
+            'SELECT player_id FROM match_players WHERE match_id=? AND team_id=?',
+            (match_id, t2)
+        ).fetchall()
         db.close()
         return jsonify({
             'match_id': match_id,
@@ -160,18 +195,21 @@ def match_players(match_id):
         data = request.get_json() or {}
         t1_list = data.get('team1_players', [])
         t2_list = data.get('team2_players', [])
-        # basic validation
         if not isinstance(t1_list, list) or not isinstance(t2_list, list):
             db.close()
             return jsonify({'error': 'Lists required'}), 400
 
         db.execute('DELETE FROM match_players WHERE match_id = ?', (match_id,))
         for pid in t1_list:
-            db.execute('INSERT INTO match_players (match_id, team_id, player_id) VALUES (?,?,?)',
-                       (match_id, m['team1_id'], pid))
+            db.execute(
+                'INSERT INTO match_players (match_id, team_id, player_id) VALUES (?,?,?)',
+                (match_id, m['team1_id'], pid)
+            )
         for pid in t2_list:
-            db.execute('INSERT INTO match_players (match_id, team_id, player_id) VALUES (?,?,?)',
-                       (match_id, m['team2_id'], pid))
+            db.execute(
+                'INSERT INTO match_players (match_id, team_id, player_id) VALUES (?,?,?)',
+                (match_id, m['team2_id'], pid)
+            )
         db.commit()
         db.close()
         return jsonify({'message': 'Match players updated'}), 200
@@ -181,28 +219,37 @@ def submit_single_result(match_id):
     data = request.get_json() or {}
     board = data.get('board')
     result = data.get('result')
-    if board not in (1,2,3,4) or result not in ('A','B','D'):
+    if board not in (1, 2, 3, 4) or result not in ('A', 'B', 'D'):
         return jsonify({'error': 'Invalid data'}), 400
 
     db = get_db_connection()
-    # overwrite any existing for this board
+    # overwrite existing for this board
     db.execute('DELETE FROM results WHERE match_id=? AND board=?', (match_id, board))
-    db.execute('INSERT INTO results (match_id, board, result) VALUES (?,?,?)',
-               (match_id, board, result))
+    db.execute(
+        'INSERT INTO results (match_id, board, result) VALUES (?,?,?)',
+        (match_id, board, result)
+    )
 
-    # recompute total scores if 4 boards done
+    # recompute total scores if results exist
     res = db.execute('SELECT result FROM results WHERE match_id=?', (match_id,)).fetchall()
-    if len(res)>0:
-        a=0; b=0
+    if len(res) > 0:
+        a = 0.0
+        b = 0.0
         for r in res:
-            if r['result']=='A': a+=1
-            elif r['result']=='B': b+=1
-            else: a+=0.5; b+=0.5
-        db.execute('UPDATE matches SET team1_score=?, team2_score=? WHERE id=?',
-                   (a,b,match_id))
+            if r['result'] == 'A':
+                a += 1
+            elif r['result'] == 'B':
+                b += 1
+            else:
+                a += 0.5
+                b += 0.5
+        db.execute(
+            'UPDATE matches SET team1_score=?, team2_score=? WHERE id=?',
+            (a, b, match_id)
+        )
     db.commit()
     db.close()
-    return jsonify({'message':'Result submitted'}), 200
+    return jsonify({'message': 'Result submitted'}), 200
 
 @app.route('/api/update-match', methods=['POST'])
 def update_match_time():
@@ -210,47 +257,54 @@ def update_match_time():
     rnd = data.get('round')
     dt = data.get('date_time')
     if rnd is None or not dt:
-        return jsonify({'error':'Round & date_time required'}),400
+        return jsonify({'error': 'Round & date_time required'}), 400
 
     db = get_db_connection()
     db.execute('UPDATE rounds SET start_time = ? WHERE round = ?', (dt, rnd))
     db.commit()
     db.close()
-    return jsonify({'message':'Round time updated'}),200
+    return jsonify({'message': 'Round time updated'}), 200
 
 # -----------------------------
 # Standings & Full Details
 # -----------------------------
-
 @app.route('/api/standings', methods=['GET'])
 def standings():
     db = get_db_connection()
     teams = db.execute('SELECT id, name FROM teams').fetchall()
-    stan = {t['id']:{'id':t['id'],'name':t['name'],'played':0,'match_points':0,'game_points':0} for t in teams}
+    stan = {
+        t['id']: {'id': t['id'], 'name': t['name'], 'played': 0, 'match_points': 0, 'game_points': 0}
+        for t in teams
+    }
 
     matches = db.execute('SELECT * FROM matches WHERE (team1_score+team2_score)=4.0').fetchall()
     for m in matches:
-        t1,t2 = m['team1_id'], m['team2_id']
-        s1,s2 = m['team1_score'], m['team2_score']
-        stan[t1]['played']+=1; stan[t2]['played']+=1
-        stan[t1]['game_points']+=s1; stan[t2]['game_points']+=s2
-        if s1>s2: stan[t1]['match_points']+=2
-        elif s2>s1: stan[t2]['match_points']+=2
+        t1, t2 = m['team1_id'], m['team2_id']
+        s1, s2 = m['team1_score'], m['team2_score']
+        stan[t1]['played'] += 1
+        stan[t2]['played'] += 1
+        stan[t1]['game_points'] += s1
+        stan[t2]['game_points'] += s2
+        if s1 > s2:
+            stan[t1]['match_points'] += 2
+        elif s2 > s1:
+            stan[t2]['match_points'] += 2
         else:
-            stan[t1]['match_points']+=1; stan[t2]['match_points']+=1
+            stan[t1]['match_points'] += 1
+            stan[t2]['match_points'] += 1
 
     db.close()
-    out = sorted(stan.values(), key=lambda x:(-x['match_points'],-x['game_points']))
+    out = sorted(stan.values(), key=lambda x: (-x['match_points'], -x['game_points']))
     return jsonify(out)
 
 @app.route('/api/match/<int:match_id>/full-details', methods=['GET'])
 def match_full_details(match_id):
     db = get_db_connection()
     m = db.execute('''
-        SELECT m.id,m.round,m.team1_id,t1.name AS team1_name,
-               m.team2_id,t2.name AS team2_name,
+        SELECT m.id, m.round, m.team1_id, t1.name AS team1_name,
+               m.team2_id, t2.name AS team2_name,
                r.start_time AS date_time,
-               m.team1_score,m.team2_score
+               m.team1_score, m.team2_score
         FROM matches m
         JOIN teams t1 ON m.team1_id=t1.id
         JOIN teams t2 ON m.team2_id=t2.id
@@ -259,7 +313,7 @@ def match_full_details(match_id):
     ''', (match_id,)).fetchone()
     if not m:
         db.close()
-        return jsonify({'error':'Match not found'}),404
+        return jsonify({'error': 'Match not found'}), 404
 
     players = db.execute('''
         SELECT mp.board, mp.team_id, mp.player_id, p.name AS player_name
@@ -268,7 +322,10 @@ def match_full_details(match_id):
         ORDER BY mp.board, mp.team_id
     ''', (match_id,)).fetchall()
 
-    results = db.execute('SELECT board, result FROM results WHERE match_id=? ORDER BY board', (match_id,)).fetchall()
+    results = db.execute(
+        'SELECT board, result FROM results WHERE match_id=? ORDER BY board',
+        (match_id,)
+    ).fetchall()
     db.close()
 
     return jsonify({
@@ -277,7 +334,7 @@ def match_full_details(match_id):
         'results': [dict(r) for r in results]
     })
 
-@app.route('/api/best_players')
+@app.route('/api/best_players', methods=['GET'])
 def best_players():
     db = get_db_connection()
     rows = db.execute('''
@@ -294,42 +351,59 @@ def best_players():
     stats = {}
     for row in rows:
         pid = row['player_id']
-        played_as = 'A' if row['team_id']==row['team1_id'] else 'B'
+        played_as = 'A' if row['team_id'] == row['team1_id'] else 'B'
         res = row['result']
-        if res=='D': pts=0.5
-        elif res=='A': pts = 1 if played_as=='A' else 0
-        elif res=='B': pts = 1 if played_as=='B' else 0
-        else: continue
+        if res == 'D':
+            pts = 0.5
+        elif res == 'A':
+            pts = 1 if played_as == 'A' else 0
+        elif res == 'B':
+            pts = 1 if played_as == 'B' else 0
+        else:
+            continue
 
         if pid not in stats:
-            stats[pid]={'id':pid,'name':row['player_name'],'team':row['team_name'],'points':0.0,'games':0}
-        stats[pid]['points']+=pts
-        stats[pid]['games']+=1
+            stats[pid] = {
+                'id': pid,
+                'name': row['player_name'],
+                'team': row['team_name'],
+                'points': 0.0,
+                'games': 0
+            }
+        stats[pid]['points'] += pts
+        stats[pid]['games'] += 1
 
     db.close()
     players = list(stats.values())
-    players.sort(key=lambda x:(-x['points'], x['name']))
+    players.sort(key=lambda x: (-x['points'], x['name']))
 
-    ranked=[]; last_pts=None; last_rank=0
-    for i,p in enumerate(players,1):
-        if p['points']!=last_pts:
-            last_rank=i; last_pts=p['points']
-        ranked.append({'rank':last_rank,**p})
+    ranked = []
+    last_pts = None
+    last_rank = 0
+    for i, p in enumerate(players, 1):
+        if p['points'] != last_pts:
+            last_rank = i
+            last_pts = p['points']
+        ranked.append({'rank': last_rank, **p})
 
-    return jsonify({'players':ranked})
+    return jsonify({'players': ranked})
 
-
+# ------------------------------------------------------------------
+# Catch-all: serve React app for non-API routes
+# ------------------------------------------------------------------
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_react(path):
+    # If the path starts with "api/", return 404 so API routes handle themselves
     if path.startswith("api/"):
-        return "Not found", 404
+        return jsonify({"error": "Not found"}), 404
 
-    file_path = os.path.join(app.static_folder, path)
-    if os.path.exists(file_path):
-        return send_from_directory(app.static_folder, path)
+    # Otherwise serve React's index.html
+    return send_from_directory(REACT_BUILD_DIR, "index.html")
 
-    return send_from_directory(app.static_folder, "index.html")
-
+# ------------------------------------------------------------------
+# Run the app
+# ------------------------------------------------------------------
 if __name__ == '__main__':
-    app.run(debug=True)
+    # In development, debug=True is fine. In production, use a WSGI server (e.g., gunicorn).
+    app.run(host='0.0.0.0', port=5000, debug=True)
