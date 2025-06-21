@@ -321,6 +321,9 @@ def best_players():
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_react(path):
-    if path.startswith('api/'):
-        return 'Not found', 404  # Avoid catching API routes
+    if path and path.startswith('api/'):
+        return 'Not found', 404
     return send_from_directory(app.static_folder, 'index.html')
+
+if __name__ == '__main__':
+    app.run(debug=True)
