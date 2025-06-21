@@ -317,12 +317,14 @@ def best_players():
         ranked.append({'rank':last_rank,**p})
 
     return jsonify({'players':ranked})
-
+    
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_react(path):
-    if path and path.startswith('api/'):
+    if path.startswith('api/'):
         return 'Not found', 404
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
     return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
