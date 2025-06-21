@@ -3,7 +3,13 @@ import sqlite3
 from datetime import datetime
 from flask_cors import CORS
 
-app = Flask(__name__)
+import os
+from flask import Flask, send_from_directory
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+REACT_BUILD_DIR = os.path.join(BASE_DIR, '../frontend/build')
+
+app = Flask(__name__, static_folder=REACT_BUILD_DIR, static_url_path="")
 CORS(app, origins=["http://localhost:3000"])
 DATABASE = 'tournament.db'
 
@@ -311,8 +317,7 @@ def best_players():
         ranked.append({'rank':last_rank,**p})
 
     return jsonify({'players':ranked})
-import os
-from flask import send_from_directory
+
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_react(path):
