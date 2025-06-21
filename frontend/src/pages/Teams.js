@@ -13,7 +13,7 @@ export default function Teams() {
 
   const fetchTeams = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/teams');
+      const res = await fetch('/api/teams');
       if (!res.ok) throw new Error('Failed to fetch teams');
       const data = await res.json();
       setTeams(data);
@@ -26,7 +26,7 @@ export default function Teams() {
   };
 
   const updateTeamName = async (teamId, name) => {
-    await fetch(`http://127.0.0.1:5000/api/team/${teamId}/edit-name`, {
+    await fetch(`/api/team/${teamId}/edit-name`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
@@ -41,14 +41,14 @@ export default function Teams() {
   if (!player) return;
 
   if (field === 'name') {
-    await fetch(`http://127.0.0.1:5000/api/player/${playerId}/edit-name`, {
+    await fetch(`/api/player/${playerId}/edit-name`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: value }),
     });
   } else {
     // rating
-    await fetch(`http://127.0.0.1:5000/api/player/${playerId}/edit-rating`, {
+    await fetch(`/api/player/${playerId}/edit-rating`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rating: parseInt(value, 10) }),
