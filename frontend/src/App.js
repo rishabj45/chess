@@ -1,4 +1,3 @@
-// src/App.js
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { useState } from 'react';
 import Layout from './layout/Layout';
@@ -8,7 +7,7 @@ import Teams from './pages/Teams';
 import BestPlayer from './pages/BestPlayer';
 
 export default function App() {
-  const [isAdmin, setIsAdmin] = useState(false); // toggle admin mode
+  const [isAdmin, setIsAdmin] = useState(false);
 
   return (
     <Router>
@@ -17,7 +16,8 @@ export default function App() {
           path="/"
           element={<Layout isAdmin={isAdmin} setIsAdmin={setIsAdmin} />}
         >
-          <Route path="" element={<Schedule />} />
+          <Route index element={<Schedule />} /> {/* Renders Schedule at "/" */}
+          <Route path="schedule" element={<Schedule />} />
           <Route path="standings" element={<Standings />} />
           <Route path="teams" element={<Teams />} />
           <Route path="best-player" element={<BestPlayer />} />

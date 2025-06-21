@@ -1,10 +1,11 @@
-// src/layout/Layout.js
 import { Link, Outlet, useLocation } from 'react-router-dom';
 
 export default function Layout({ isAdmin, setIsAdmin }) {
   const location = useLocation();
   const active = (path) =>
-    location.pathname === path ? 'font-bold text-blue-600' : '';
+    location.pathname === path || (path === '/schedule' && location.pathname === '/') 
+      ? 'font-bold text-blue-600'
+      : '';
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -14,12 +14,12 @@ export default function Schedule() {
 
   const fetchMatches = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/matches');
+      const res = await fetch('/api/matches');
       if (!res.ok) throw new Error('Failed to load schedule');
       const list = await res.json();
       const detailed = await Promise.all(
         list.map(async (m) => {
-          const r = await fetch(`http://127.0.0.1:5000/api/match/${m.id}/full-details`);
+          const r = await fetch(`/api/match/${m.id}/full-details`);
           if (!r.ok) throw new Error(`Failed to load match ${m.id}`);
           return r.json();
         })
@@ -52,7 +52,7 @@ export default function Schedule() {
 
   const handleRoundTimeUpdate = async (round, newDateTime) => {
     const iso = new Date(newDateTime).toISOString();
-    const res = await fetch('http://127.0.0.1:5000/api/update-match', {
+    const res = await fetch('/api/update-match', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ round: parseInt(round), date_time: iso }),
@@ -69,7 +69,7 @@ export default function Schedule() {
   };
 
   const submitBoardResult = async (matchId, board, result) => {
-    const res = await fetch(`http://127.0.0.1:5000/api/match/${matchId}/submit-single`, {
+    const res = await fetch(`/api/match/${matchId}/submit-single`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ board, result }),
